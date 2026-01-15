@@ -85,6 +85,7 @@ Frontend: HTML, CSS, JavaScript
 Backend: Node.js, Express.js
 Database: MySQL
 Version Control: Git & GitHub
+LLM - gpt 5.0 
 
 ▶️ How to Run Locally
 # Backend
