@@ -5,6 +5,12 @@ const adminId = localStorage.getItem("adminId");
 const collegeId = localStorage.getItem("collegeId");
 const collegeName = localStorage.getItem("collegeName");
 
+function formatEventDate(value) {
+    if (!value) return "-";
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? "-" : parsed.toLocaleDateString();
+}
+
 /* ================= INIT ================= */
 document.addEventListener("DOMContentLoaded", () => {
 
@@ -19,7 +25,11 @@ document.addEventListener("DOMContentLoaded", () => {
         collegeEl.innerText = collegeName;
     }
 
+    document.getElementById("createEventBtn")
+        .addEventListener("click", createEvent);
+
     loadEvents();
+    updateExamFields();
 
     // Event select change
     document.getElementById("eventSelect").addEventListener("change", e => {
@@ -34,6 +44,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (e.target.value) {
             loadExams(e.target.value);
         }
+        updateExamFields();
     });
 
     // Course dropdown change (OTHER handling)
@@ -73,10 +84,12 @@ function loadEvents() {
             data.forEach(event => {
                 const row = document.createElement("tr");
 
+                const dateValue =
+                    event.exam_date || event.exam_start_date || event.exam_end_date;
                 row.innerHTML = `
                     <td>${event.event_id}</td>
                     <td>${event.exam_name}</td>
-                    <td>${new Date(event.exam_date).toLocaleDateString()}</td>
+                    <td>${formatEventDate(dateValue)}</td>
                     <td>${event.start_time} - ${event.end_time}</td>
                     <td>${event.cutoff_percentage}</td>
                     <td>
@@ -103,9 +116,11 @@ function loadEvents() {
                 const opt = document.createElement("option");
                 opt.value = event.event_id;
                 opt.dataset.active = event.is_active;
+                opt.dataset.type = (event.event_type || "REGULAR").toUpperCase();
                 opt.textContent = event.exam_name;
                 eventSelect.appendChild(opt);
             });
+            updateExamFields();
         })
         .catch(err => console.error("Load events error:", err));
 }
@@ -117,6 +132,8 @@ function createEvent() {
     const start = document.getElementById("startTime").value;
     const end = document.getElementById("endTime").value;
     const cutoff = document.getElementById("cutoff").value;
+    const eventType =
+        document.getElementById("eventType")?.value?.trim() || "REGULAR";
 
     if (!name || !date || !start || !end || !cutoff) {
         alert("Fill all event details");
@@ -128,10 +145,12 @@ function createEvent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             exam_name: name,
-            exam_date: date,
+            exam_start_date: date,
+            exam_end_date: date,
             start_time: start,
             end_time: end,
             cutoff_percentage: cutoff,
+            event_type: (eventType || "REGULAR").toUpperCase(),
             college_id: collegeId
         })
     })
@@ -195,22 +214,67 @@ function createExam() {
     const eventId = document.getElementById("eventSelect").value;
     const courseSelect = document.getElementById("courseSelect").value;
     const customCourse = document.getElementById("customCourse").value;
+    const streamSelect = document.getElementById("streamSelect").value;
+    const selectedType = (
+        document.getElementById("eventSelect")
+            .options[
+                document.getElementById("eventSelect").selectedIndex
+            ]?.dataset?.type || "REGULAR"
+    ).toUpperCase();
 
-    let course = courseSelect === "OTHER" ? customCourse.trim() : courseSelect;
+    const payload = { event_id: eventId };
 
-    if (!eventId || !course) {
-        alert("Select event and course");
+    if (!eventId) {
+        alert("Select an event");
         return;
+    }
+
+    if (selectedType === "WALKIN") {
+        if (!streamSelect) {
+            alert("Select a stream for walk-in exams");
+            return;
+        }
+        payload.stream = streamSelect;
+    } else {
+        const course =
+            courseSelect === "OTHER" ? customCourse.trim() : courseSelect;
+        if (!course) {
+            alert("Select a course for regular exams");
+            return;
+        }
+        payload.course = course;
     }
 
     fetch(`/admin/exam`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            event_id: eventId,
-            course: course
-        })
+        body: JSON.stringify(payload)
     }).then(() => loadExams(eventId));
+}
+
+function updateExamFields() {
+    const eventSelect = document.getElementById("eventSelect");
+    const courseSelect = document.getElementById("courseSelect");
+    const customInput = document.getElementById("customCourse");
+    const streamSelect = document.getElementById("streamSelect");
+
+    if (!eventSelect || !courseSelect || !customInput || !streamSelect) {
+        return;
+    }
+
+    const selectedOption = eventSelect.options[eventSelect.selectedIndex];
+    const eventType = (selectedOption?.dataset?.type || "REGULAR").toUpperCase();
+
+    if (eventType === "WALKIN") {
+        streamSelect.style.display = "block";
+        courseSelect.style.display = "none";
+        customInput.style.display = "none";
+        courseSelect.value = "";
+    } else {
+        streamSelect.style.display = "none";
+        streamSelect.value = "";
+        courseSelect.style.display = "block";
+    }
 }
 
 /* ================= DELETE EXAM ================= */

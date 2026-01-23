@@ -1,22 +1,7 @@
 const express = require("express");
-const path = require("path");
 const router = express.Router();
 const db = require("../db");
 const { generateQuestionsForCourse } = require("../Generator");
-
-/* ================= ADMIN LOGIN PAGE ================= */
-router.get("/", (req, res) => {
-    res.sendFile(
-        path.join(__dirname, "../../Frontend/admin-login.html")
-    );
-});
-
-/* ================= ADMIN DASHBOARD PAGE ================= */
-router.get("/dashboard", (req, res) => {
-    res.sendFile(
-        path.join(__dirname, "../../Frontend/admin-dashboard.html")
-    );
-});
 
 /* ================= ADMIN LOGIN API ================= */
 router.post("/login", (req, res) => {
@@ -25,6 +10,10 @@ router.post("/login", (req, res) => {
     if (!email || !password) {
         return res.json({ success: false });
     }
+
+    const startDate = exam_start_date || req.body.exam_date;
+    const endDate = exam_end_date || req.body.exam_date;
+    const eventType = (event_type || "REGULAR").toUpperCase();
 
     db.query(
         `
@@ -55,19 +44,30 @@ router.post("/event", (req, res) => {
     const {
         college_id,
         exam_name,
-        exam_date,
+        exam_start_date,
+        exam_end_date,
         start_time,
         end_time,
-        cutoff_percentage
+        cutoff_percentage,
+        event_type
     } = req.body;
 
     db.query(
         `
         INSERT INTO exam_event
-        (college_id, exam_name, exam_date, start_time, end_time, cutoff_percentage, is_active, is_deleted)
-        VALUES (?, ?, ?, ?, ?, ?, 'NO', 'NO')
+        (college_id, exam_name, exam_start_date, exam_end_date, start_time, end_time, cutoff_percentage, event_type, who_updated, updated_date, is_active, is_deleted)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ADMIN', CURRENT_DATE(), 'NO', 'NO')
         `,
-        [college_id, exam_name, exam_date, start_time, end_time, cutoff_percentage],
+        [
+            college_id,
+            exam_name,
+            startDate,
+            endDate,
+            start_time,
+            end_time,
+            cutoff_percentage,
+            eventType
+        ],
         err => {
             if (err) {
                 console.error("❌ Create event error:", err);
@@ -116,7 +116,7 @@ router.get("/events/:collegeId", (req, res) => {
         FROM exam_event
         WHERE college_id = ?
           AND (is_deleted = 'NO' OR is_deleted IS NULL)
-        ORDER BY exam_date
+        ORDER BY exam_start_date
         `,
         [req.params.collegeId],
         (err, rows) => {
@@ -152,44 +152,23 @@ router.get("/exams/:eventId", (req, res) => {
 router.post("/exam", (req, res) => {
     const { event_id, course } = req.body;
 
-    if (!event_id || !course) {
-        return res.status(400).json({
-            success: false,
-            message: "Event and course are required"
-        });
+    if (!event_id || !course || !course.trim()) {
+        return res.json({ success: false });
     }
 
-    // Prevent duplicate (event_id + course)
     db.query(
-        `SELECT 1 FROM exams WHERE event_id = ? AND course = ?`,
-        [event_id, course],
-        (err, rows) => {
+        `
+        INSERT INTO exams (event_id, course, exam_status)
+        VALUES (?, ?, 'DRAFT')
+        ON DUPLICATE KEY UPDATE exam_status = 'DRAFT'
+        `,
+        [event_id, course.trim()],
+        err => {
             if (err) {
-                console.error("❌ Exam check error:", err);
+                console.error("❌ Create exam error:", err);
                 return res.json({ success: false });
             }
-
-            if (rows.length > 0) {
-                return res.status(409).json({
-                    success: false,
-                    message: "Exam already exists for this course"
-                });
-            }
-
-            db.query(
-                `
-                INSERT INTO exams (event_id, course, exam_status, is_deleted)
-                VALUES (?, ?, 'DRAFT', 'NO')
-                `,
-                [event_id, course],
-                err2 => {
-                    if (err2) {
-                        console.error("❌ Create exam error:", err2);
-                        return res.json({ success: false });
-                    }
-                    res.json({ success: true });
-                }
-            );
+            res.json({ success: true });
         }
     );
 });
@@ -225,20 +204,12 @@ router.delete("/exam/:examId", (req, res) => {
 /* ================= GENERATE QUESTIONS ================= */
 router.post("/generate-questions/:examId", async (req, res) => {
     const examId = req.params.examId;
-    const questionCount = Number(req.body.questionCount) || 10;
-
-    if (questionCount < 5 || questionCount > 50) {
-        return res.json({
-            success: false,
-            message: "Question count must be between 5 and 50"
-        });
-    }
+    const questionCount = 5;
 
     db.query(
         `SELECT course, exam_status FROM exams WHERE exam_id = ?`,
         [examId],
         async (err, rows) => {
-
             if (err || !rows || rows.length === 0) {
                 return res.json({
                     success: false,

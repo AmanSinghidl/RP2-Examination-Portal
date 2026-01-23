@@ -1,9 +1,12 @@
 /**
  * Generator.js
- * Aptitude questions generated via Azure OpenAI based on course name.
+ * Aptitude questions generated via Azure OpenAI based on course name or walk-in stream.
  */
 
 const axios = require("axios");
+const fs = require("fs");
+const path = require("path");
+const dotenv = require("dotenv");
 
 function getDifficultyByCourse(course) {
     const name = String(course || "").toLowerCase();
@@ -15,14 +18,43 @@ function getDifficultyByCourse(course) {
     return "MEDIUM";
 }
 
+function loadEnvFromCandidates() {
+    const candidates = [
+        path.resolve(__dirname, ".env"),
+        path.resolve(__dirname, "../.env"),
+        path.resolve(__dirname, "../Backend/.env"),
+        path.resolve(__dirname, "../../.env")
+    ];
+
+    candidates.forEach(candidate => {
+        if (fs.existsSync(candidate)) {
+            dotenv.config({ path: candidate });
+        }
+    });
+}
+
+loadEnvFromCandidates();
+
 function getAzureConfig() {
-    const endpoint = process.env.AZURE_OPENAI_ENDPOINT || "";
-    const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || "";
-    const apiVersion = process.env.AZURE_OPENAI_API_VERSION || "";
-    const apiKey = process.env.AZURE_OPENAI_API_KEY || "";
+    const endpoint = (process.env.AZURE_OPENAI_ENDPOINT || "").trim();
+    const deployment = (process.env.AZURE_OPENAI_DEPLOYMENT || "").trim();
+    const apiVersion = (process.env.AZURE_OPENAI_API_VERSION || "").trim();
+    const apiKey = (process.env.AZURE_OPENAI_API_KEY || "").trim();
 
     if (!endpoint || !deployment || !apiVersion || !apiKey) {
-        throw new Error("Azure OpenAI config missing in environment");
+        const missing = [
+            endpoint ? null : "AZURE_OPENAI_ENDPOINT",
+            deployment ? null : "AZURE_OPENAI_DEPLOYMENT",
+            apiVersion ? null : "AZURE_OPENAI_API_VERSION",
+            apiKey ? null : "AZURE_OPENAI_API_KEY"
+        ]
+            .filter(Boolean)
+            .join(", ");
+
+        throw new Error(
+            `Azure OpenAI config missing in environment (${missing}). ` +
+            "Use Backend/.env (or Backend/Backend/.env) to set the values before starting the server."
+        );
     }
 
     return { endpoint, deployment, apiVersion, apiKey };
@@ -46,6 +78,26 @@ Rules:
 - exactly 4 options, only one correct
 - no markdown, no extra text
 - make questions different from each other
+`;
+}
+
+function buildStreamPrompt(stream, difficulty, count, avoidList) {
+    const avoidText = avoidList && avoidList.length > 0
+        ? `Avoid these exact question texts:\n${avoidList.map(q => `- ${q}`).join("\n")}\n`
+        : "";
+
+    return `
+Generate ${count} analytical and applied reasoning questions for the walk-in stream "${stream}".
+Difficulty should be ${difficulty}.
+Prioritize data-and analytics-focused scenarios (data interpretation, logical reasoning, real-world problem solving, metrics, business math, estimations) that reflect what a walk-in student should master.
+${avoidText}
+Return ONLY a JSON array of objects with these exact keys:
+question_text, option_a, option_b, option_c, option_d, correct_answer
+Rules:
+- correct_answer must be one of: A, B, C, D
+- exactly 4 options, only one correct
+- no markdown, no extra text
+- keep options concise and varied
 `;
 }
 
@@ -117,8 +169,8 @@ function shuffleInPlace(items) {
     }
 }
 
-async function generateBatch(course, difficulty, count, avoidList) {
-    const prompt = buildPrompt(course, difficulty, count, avoidList);
+async function generateBatch(source, difficulty, count, avoidList, promptBuilder) {
+    const prompt = promptBuilder(source, difficulty, count, avoidList);
     const data = await callAzure([
         {
             role: "system",
@@ -143,9 +195,11 @@ async function generateBatch(course, difficulty, count, avoidList) {
     return normalized;
 }
 
-async function generateQuestionsForCourse(course, count = 10) {
-    const cleanedCourse = String(course || "").trim();
-    const difficulty = getDifficultyByCourse(cleanedCourse);
+async function generateQuestionsForSource(source, difficulty, count, promptBuilder) {
+    const cleanedSource = String(source || "").trim();
+    if (!cleanedSource) {
+        throw new Error("Missing source for question generation");
+    }
 
     const unique = new Map();
     const maxAttempts = 3;
@@ -154,7 +208,7 @@ async function generateQuestionsForCourse(course, count = 10) {
     while (unique.size < count && attempt < maxAttempts) {
         const remaining = count - unique.size;
         const avoidList = Array.from(unique.keys());
-        const batch = await generateBatch(cleanedCourse, difficulty, remaining, avoidList);
+        const batch = await generateBatch(cleanedSource, difficulty, remaining, avoidList, promptBuilder);
 
         for (const q of batch) {
             const key = q.question_text.toLowerCase();
@@ -169,6 +223,17 @@ async function generateQuestionsForCourse(course, count = 10) {
     return result;
 }
 
+async function generateQuestionsForCourse(course, count = 10) {
+    const difficulty = getDifficultyByCourse(course);
+    return generateQuestionsForSource(course, difficulty, count, buildPrompt);
+}
+
+async function generateQuestionsForStream(stream, count = 10) {
+    const difficulty = getDifficultyByCourse(stream);
+    return generateQuestionsForSource(stream, difficulty, count, buildStreamPrompt);
+}
+
 module.exports = {
-    generateQuestionsForCourse
+    generateQuestionsForCourse,
+    generateQuestionsForStream
 };

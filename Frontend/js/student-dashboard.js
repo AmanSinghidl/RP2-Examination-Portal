@@ -9,6 +9,12 @@ if (!studentId || !studentName) {
     window.location.href = "/";
 }
 
+function formatExamDate(value) {
+    if (!value) return "-";
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? "-" : parsed.toLocaleDateString();
+}
+
 /* ================= INIT ================= */
 document.addEventListener("DOMContentLoaded", () => {
 
@@ -46,17 +52,21 @@ function loadStudentExams(studentId) {
 
             data.forEach(exam => {
                 const row = document.createElement("tr");
-                row.innerHTML = `
-                    <td>${exam.exam_name}</td>
-                    <td>${new Date(exam.exam_date).toLocaleDateString()}</td>
-                    <td>${exam.start_time} - ${exam.end_time}</td>
-                    <td>${exam.class}</td>
-                    <td>
-                        <button onclick="startExam(${exam.exam_id})">
-                            Start Exam
-                        </button>
-                    </td>
-                `;
+            const displayDate = formatExamDate(
+                exam.exam_start_date || exam.exam_end_date || exam.exam_date
+            );
+
+            row.innerHTML = `
+                <td>${exam.exam_name}</td>
+                <td>${displayDate}</td>
+                <td>${exam.start_time} - ${exam.end_time}</td>
+                <td>${exam.class}</td>
+                <td>
+                    <button onclick="startExam(${exam.exam_id})">
+                        Start Exam
+                    </button>
+                </td>
+            `;
                 table.appendChild(row);
             });
         })
@@ -93,12 +103,16 @@ function loadAttemptedExams(studentId) {
 
             data.forEach(exam => {
                 const row = document.createElement("tr");
-                row.innerHTML = `
-                    <td>${exam.exam_name}</td>
-                    <td>${new Date(exam.exam_date).toLocaleDateString()}</td>
-                    <td>${exam.class}</td>
-                    <td>${exam.attempt_status}</td>
-                `;
+            const displayDate = formatExamDate(
+                exam.exam_start_date || exam.exam_end_date || exam.exam_date
+            );
+
+            row.innerHTML = `
+                <td>${exam.exam_name}</td>
+                <td>${displayDate}</td>
+                <td>${exam.class}</td>
+                <td>${exam.attempt_status}</td>
+            `;
                 table.appendChild(row);
             });
         })

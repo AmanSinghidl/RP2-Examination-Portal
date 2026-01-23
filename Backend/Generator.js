@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const path = require("path");
 const db = require("./db"); 
@@ -27,6 +28,10 @@ router.post("/login", (req, res) => {
         return res.json({ success: false });
     }
 
+    const startDate = exam_start_date || req.body.exam_date;
+    const endDate = exam_end_date || req.body.exam_date;
+    const eventType = (event_type || "REGULAR").toUpperCase();
+
     db.query(
         `
         SELECT a.admin_id, a.college_id, c.college_name
@@ -55,19 +60,30 @@ router.post("/event", (req, res) => {
     const {
         college_id,
         exam_name,
-        exam_date,
+        exam_start_date,
+        exam_end_date,
         start_time,
         end_time,
-        cutoff_percentage
+        cutoff_percentage,
+        event_type
     } = req.body;
 
     db.query(
         `
         INSERT INTO exam_event
-        (college_id, exam_name, exam_date, start_time, end_time, cutoff_percentage, is_active, is_deleted)
-        VALUES (?, ?, ?, ?, ?, ?, 'NO', 'NO')
+        (college_id, exam_name, exam_start_date, exam_end_date, start_time, end_time, cutoff_percentage, event_type, who_updated, updated_date, is_active, is_deleted)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ADMIN', CURRENT_DATE(), 'NO', 'NO')
         `,
-        [college_id, exam_name, exam_date, start_time, end_time, cutoff_percentage],
+        [
+            college_id,
+            exam_name,
+            startDate,
+            endDate,
+            start_time,
+            end_time,
+            cutoff_percentage,
+            eventType
+        ],
         err => {
             if (err) {
                 console.error("❌ Create event error:", err);
@@ -110,7 +126,7 @@ router.get("/events/:collegeId", (req, res) => {
         FROM exam_event
         WHERE college_id = ?
           AND (is_deleted = 'NO' OR is_deleted IS NULL)
-        ORDER BY exam_date
+        ORDER BY exam_start_date
         `,
         [req.params.collegeId],
         (err, rows) => {
