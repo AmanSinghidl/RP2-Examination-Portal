@@ -2,31 +2,61 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Admin Login</title>
   <link rel="stylesheet" href="/css/common.css">
 </head>
-<body>
+<body class="landing-page admin-landing auth-page">
 
-<header class="header">
-  <h1>Scholarship Examination Portal</h1>
-  <p>Administrator Access</p>
-</header>
+<div class="landing-shell">
+  <header class="landing-header">
+    <div class="brand">
+      <span class="brand-mark">RP2</span>
+      <span class="brand-text">RP2 Scholarship Exam</span>
+    </div>
+    <nav class="landing-nav">
+      <a href="/admin" class="nav-link">Admin Home</a>
+      <a href="#" class="nav-link">Support</a>
+      <a class="nav-cta" href="/admin/login">Login</a>
+    </nav>
+  </header>
 
-<section class="container">
-  <div class="auth-box login-box">
-    <h2>Admin Login</h2>
+  <main class="auth-main">
+    <section class="auth-copy">
+      <p class="hero-eyebrow">Administrator Access</p>
+      <h1>Secure control for scholarship exams.</h1>
+      <p class="hero-subtitle">
+        Manage schedules, monitor live sessions, and publish verified results with confidence.
+        Sign in to continue to the admin console.
+      </p>
+      <div class="auth-highlight">
+        <div>
+          <span class="metric-value">Role Based</span>
+          <span class="metric-label">Access controls</span>
+        </div>
+        <div>
+          <span class="metric-value">Audit Trail</span>
+          <span class="metric-label">Every action logged</span>
+        </div>
+      </div>
+    </section>
 
-    <form onsubmit="adminLogin(); return false;">
-      <input type="email" id="email" placeholder="Admin Email" required>
-      <input type="password" id="password" placeholder="Password" required>
-      <button type="submit">Login</button>
-    </form>
-  </div>
-</section>
+    <section class="auth-card">
+      <h2>Admin Login</h2>
+      <p class="auth-meta">Use your official admin email and password.</p>
+      <form onsubmit="adminLogin(); return false;">
+        <input type="email" id="email" placeholder="Admin Email" required>
+        <input type="password" id="password" placeholder="Password" required>
+        <button type="submit">Login</button>
+      </form>
+      <p class="auth-help">Need access? Contact your scholarship coordinator.</p>
+    </section>
+  </main>
 
-<footer class="footer">
-  © 2025 Scholarship Examination Portal
-</footer>
+  <footer class="landing-footer">
+    Ac 2025 Scholarship Examination Portal
+  </footer>
+</div>
 
 <script src="/js/admin-login.js"></script>
 </body>

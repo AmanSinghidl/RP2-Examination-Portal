@@ -6,9 +6,19 @@ const collegeId = localStorage.getItem("collegeId");
 const collegeName = localStorage.getItem("collegeName");
 
 function formatEventDate(value) {
-    if (!value) return "-";
+    if (!value) return null;
     const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? "-" : parsed.toLocaleDateString();
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed.toLocaleDateString();
+}
+
+function formatEventDateRange(event) {
+    const startText = formatEventDate(event.exam_start_date || event.exam_date);
+    const endText = formatEventDate(event.exam_end_date || event.exam_date);
+    if (startText && endText && startText !== endText) {
+        return `${startText} to ${endText}`;
+    }
+    return startText || endText || "-";
 }
 
 /* ================= INIT ================= */
@@ -25,38 +35,38 @@ document.addEventListener("DOMContentLoaded", () => {
         collegeEl.innerText = collegeName;
     }
 
+    // 🔹 Button bindings (IMPORTANT)
     document.getElementById("createEventBtn")
         .addEventListener("click", createEvent);
 
+    document.getElementById("createExamBtn")
+        .addEventListener("click", createExam);
+
+    document.getElementById("generateBtn")
+        .addEventListener("click", generateQuestions);
+
+    // 🔹 Dropdown handlers
+    document.getElementById("eventSelect")
+        .addEventListener("change", e => {
+            if (e.target.value) {
+                loadExams(e.target.value);
+            }
+            updateExamFields();
+        });
+
+    document.getElementById("courseSelect")
+        .addEventListener("change", e => {
+            const customInput = document.getElementById("customCourse");
+            if (e.target.value === "OTHER") {
+                customInput.style.display = "block";
+            } else {
+                customInput.style.display = "none";
+                customInput.value = "";
+            }
+        });
+
     loadEvents();
     updateExamFields();
-
-    // Event select change
-    document.getElementById("eventSelect").addEventListener("change", e => {
-        const selected = e.target.options[e.target.selectedIndex];
-        const isActive = selected.dataset.active === "YES";
-
-        const inactiveNote = document.getElementById("inactiveNote");
-        if (inactiveNote) {
-            inactiveNote.style.display = isActive ? "none" : "block";
-        }
-
-        if (e.target.value) {
-            loadExams(e.target.value);
-        }
-        updateExamFields();
-    });
-
-    // Course dropdown change (OTHER handling)
-    document.getElementById("courseSelect").addEventListener("change", e => {
-        const customInput = document.getElementById("customCourse");
-        if (e.target.value === "OTHER") {
-            customInput.style.display = "block";
-        } else {
-            customInput.style.display = "none";
-            customInput.value = "";
-        }
-    });
 });
 
 /* ================= LOAD EVENTS ================= */
@@ -76,31 +86,20 @@ function loadEvents() {
                         <td colspan="7" style="text-align:center;">
                             No events found
                         </td>
-                    </tr>
-                `;
+                    </tr>`;
                 return;
             }
 
             data.forEach(event => {
                 const row = document.createElement("tr");
-
-                const dateValue =
-                    event.exam_date || event.exam_start_date || event.exam_end_date;
+                const eventDateDisplay = formatEventDateRange(event);
                 row.innerHTML = `
                     <td>${event.event_id}</td>
                     <td>${event.exam_name}</td>
-                    <td>${formatEventDate(dateValue)}</td>
+                    <td>${eventDateDisplay}</td>
                     <td>${event.start_time} - ${event.end_time}</td>
                     <td>${event.cutoff_percentage}</td>
-                    <td>
-                        <span class="${
-                            event.is_active === "YES"
-                                ? "status-active"
-                                : "status-inactive"
-                        }">
-                            ${event.is_active}
-                        </span>
-                    </td>
+                    <td>${event.is_active}</td>
                     <td>
                         <button onclick="toggleEventStatus(${event.event_id}, '${event.is_active}')">
                             ${event.is_active === "YES" ? "Deactivate" : "Activate"}
@@ -113,11 +112,10 @@ function loadEvents() {
                 `;
                 table.appendChild(row);
 
-                const opt = document.createElement("option");
-                opt.value = event.event_id;
-                opt.dataset.active = event.is_active;
-                opt.dataset.type = (event.event_type || "REGULAR").toUpperCase();
-                opt.textContent = event.exam_name;
+            const opt = document.createElement("option");
+            opt.value = event.event_id;
+            opt.dataset.type = (event.event_type || "REGULAR").toUpperCase();
+            opt.textContent = event.exam_name;
                 eventSelect.appendChild(opt);
             });
             updateExamFields();
@@ -127,15 +125,16 @@ function loadEvents() {
 
 /* ================= CREATE EVENT ================= */
 function createEvent() {
-    const name = document.getElementById("eventName").value;
-    const date = document.getElementById("eventDate").value;
+    const name = document.getElementById("eventName").value.trim();
+    const startDate = document.getElementById("examStartDate").value;
+    const endDate = document.getElementById("examEndDate").value;
     const start = document.getElementById("startTime").value;
     const end = document.getElementById("endTime").value;
     const cutoff = document.getElementById("cutoff").value;
     const eventType =
         document.getElementById("eventType")?.value?.trim() || "REGULAR";
 
-    if (!name || !date || !start || !end || !cutoff) {
+    if (!name || !startDate || !endDate || !start || !end || !cutoff || !eventType) {
         alert("Fill all event details");
         return;
     }
@@ -144,23 +143,25 @@ function createEvent() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+            college_id: collegeId,
             exam_name: name,
-            exam_start_date: date,
-            exam_end_date: date,
+            exam_start_date: startDate,
+            exam_end_date: endDate,
             start_time: start,
             end_time: end,
             cutoff_percentage: cutoff,
-            event_type: (eventType || "REGULAR").toUpperCase(),
-            college_id: collegeId
+            event_type: eventType.toUpperCase()
         })
     })
     .then(res => res.json())
     .then(data => {
         document.getElementById("eventStatus").innerText =
-            data.success
-                ? "✅ Event created"
-                : "❌ Event creation failed";
+            data.success ? "Event created" : "Event creation failed";
         loadEvents();
+    })
+    .catch(err => {
+        console.error("Create event error:", err);
+        document.getElementById("eventStatus").innerText = "Server error";
     });
 }
 
@@ -181,8 +182,7 @@ function loadExams(eventId) {
                         <td colspan="4" style="text-align:center;">
                             No exams found
                         </td>
-                    </tr>
-                `;
+                    </tr>`;
                 return;
             }
 
@@ -206,14 +206,15 @@ function loadExams(eventId) {
                 opt.textContent = `Exam ${exam.exam_id} (${exam.course})`;
                 examSelect.appendChild(opt);
             });
-        });
+        })
+        .catch(err => console.error("Load exams error:", err));
 }
 
 /* ================= CREATE EXAM ================= */
 function createExam() {
     const eventId = document.getElementById("eventSelect").value;
     const courseSelect = document.getElementById("courseSelect").value;
-    const customCourse = document.getElementById("customCourse").value;
+    const customCourse = document.getElementById("customCourse").value.trim();
     const streamSelect = document.getElementById("streamSelect").value;
     const selectedType = (
         document.getElementById("eventSelect")
@@ -237,7 +238,7 @@ function createExam() {
         payload.stream = streamSelect;
     } else {
         const course =
-            courseSelect === "OTHER" ? customCourse.trim() : courseSelect;
+            courseSelect === "OTHER" ? customCourse : courseSelect;
         if (!course) {
             alert("Select a course for regular exams");
             return;
@@ -249,7 +250,9 @@ function createExam() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
-    }).then(() => loadExams(eventId));
+    })
+    .then(() => loadExams(eventId))
+    .catch(err => console.error("Create exam error:", err));
 }
 
 function updateExamFields() {
@@ -277,18 +280,15 @@ function updateExamFields() {
     }
 }
 
-/* ================= DELETE EXAM ================= */
+/* ================= DELETE / STATUS ================= */
 function deleteExam(examId, eventId) {
     if (!confirm("Delete this exam?")) return;
-
     fetch(`/admin/exam/${examId}`, { method: "DELETE" })
         .then(() => loadExams(eventId));
 }
 
-/* ================= EVENT ACTIONS ================= */
 function toggleEventStatus(eventId, currentStatus) {
     const newStatus = currentStatus === "YES" ? "NO" : "YES";
-
     fetch(`/admin/event/status/${eventId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -298,9 +298,8 @@ function toggleEventStatus(eventId, currentStatus) {
 
 function deleteEvent(eventId) {
     if (!confirm("Delete this event?")) return;
-
     fetch(`/admin/event/delete/${eventId}`, { method: "PUT" })
-        .then(() => loadEvents());
+        .then(loadEvents);
 }
 
 /* ================= GENERATE QUESTIONS ================= */
@@ -314,28 +313,30 @@ function generateQuestions() {
         return;
     }
 
-    status.innerText = "⏳ Generating questions...";
+    status.innerText = "Generating questions...";
 
     fetch(`/admin/generate-questions/${examId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            questionCount: Number(questionCount)
-        })
+        body: JSON.stringify({ questionCount: Number(questionCount) })
     })
     .then(res => res.json())
     .then(data => {
         status.innerText = data.success
-            ? "✅ Questions generated successfully"
-            : data.message || "❌ Generation failed";
+            ? "Questions generated successfully"
+            : data.message || "Generation failed";
     })
     .catch(() => {
-        status.innerText = "❌ Server error during generation";
+        status.innerText = "Server error during generation";
     });
 }
 
 /* ================= LOGOUT ================= */
 function logoutAdmin() {
-    localStorage.clear();
-    window.location.href = "/admin";
+    fetch("/admin/logout", { method: "POST" })
+        .catch(() => {})
+        .finally(() => {
+            localStorage.clear();
+            window.location.href = "/admin/login";
+        });
 }

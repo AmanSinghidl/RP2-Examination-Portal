@@ -28,6 +28,7 @@ function studentLogin() {
         // ✅ STORE SESSION
         localStorage.setItem("studentId", data.studentId);
         localStorage.setItem("studentName", data.name);
+        localStorage.setItem("studentEmail", email);
 
         // ✅ REDIRECT (VERY IMPORTANT)
         window.location.href = "/student/dashboard";

@@ -1,8 +1,3 @@
-// ✅ Prevent login page if already logged in
-if (localStorage.getItem("adminId") && localStorage.getItem("collegeId")) {
-  window.location.href = "/admin/dashboard";
-}
-
 function adminLogin() {
   const email = document.getElementById("email").value.trim();
   const password = document.getElementById("password").value.trim();
@@ -35,3 +30,4 @@ function adminLogin() {
       alert("Server error");
     });
 }
+

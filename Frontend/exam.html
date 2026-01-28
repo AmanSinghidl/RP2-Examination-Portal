@@ -6,11 +6,11 @@
     <link rel="stylesheet" href="css/common.css">
     <link rel="stylesheet" href="css/exam.css">
 </head>
-<body>
+<body class="exam-page">
 
 <header class="admin-header">
     <div>
-        <h1>Online Exam</h1>
+        <h1>RP2 Scholarship Exam</h1>
         <p id="timerText">Time Left: --:--</p>
     </div>
 </header>
@@ -20,11 +20,19 @@
 <div class="admin-section">
     <h2 id="examTitle">Exam</h2>
     <form id="examForm">
-        <div id="questionsContainer"></div>
+        <div class="question-toolbar">
+            <span id="questionCounter">Question 1</span>
+            <span class="question-progress" id="questionProgress"></span>
+        </div>
+        <div id="questionsContainer" class="question-stage"></div>
 
-        <button type="submit" class="submit-btn">
-            Submit Exam
-        </button>
+        <div class="exam-actions">
+            <button type="button" class="nav-btn" id="prevBtn">Previous</button>
+            <button type="button" class="nav-btn primary" id="nextBtn">Next</button>
+            <button type="submit" class="submit-btn" id="submitBtn">
+                Submit Exam
+            </button>
+        </div>
     </form>
 </div>
 

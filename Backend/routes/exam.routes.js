@@ -2,8 +2,23 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 
+router.use((req, res, next) => {
+    if (req.method === "OPTIONS") {
+        return next();
+    }
+
+    if (!req.session?.student) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+    next();
+});
+
 /* ================= CHECK ATTEMPT ================= */
 router.get("/attempted/:studentId/:examId", (req, res) => {
+    if (String(req.params.studentId) !== String(req.session.student.studentId)) {
+        return res.status(403).json({ success: false, message: "Forbidden" });
+    }
+
     db.query(
         `SELECT result_id FROM results WHERE student_id = ? AND exam_id = ?`,
         [req.params.studentId, req.params.examId],
@@ -33,6 +48,10 @@ router.post("/submit", (req, res) => {
 
     if (!answers || answers.length === 0) {
         return res.json({ success: false });
+    }
+
+    if (String(studentId) !== String(req.session.student.studentId)) {
+        return res.status(403).json({ success: false, message: "Forbidden" });
     }
 
     db.query(
@@ -77,6 +96,10 @@ router.post("/result", (req, res) => {
 
     if (!studentId || !examId) {
         return res.json({ success: false, message: "Missing student or exam" });
+    }
+
+    if (String(studentId) !== String(req.session.student.studentId)) {
+        return res.status(403).json({ success: false, message: "Forbidden" });
     }
 
     db.query(

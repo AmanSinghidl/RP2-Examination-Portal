@@ -1,251 +1,239 @@
-require("dotenv").config();
-const express = require("express");
+/**
+ * Generator.js
+ * Aptitude questions generated via Azure OpenAI based on course name or walk-in stream.
+ */
+
+const axios = require("axios");
+const fs = require("fs");
 const path = require("path");
-const db = require("./db"); 
+const dotenv = require("dotenv");
 
+function getDifficultyByCourse(course) {
+    const name = String(course || "").toLowerCase();
 
-const router = express.Router();
+    if (name.includes("mtech")) return "HARD";
+    if (name.includes("mca") || name.includes("btech")) return "MEDIUM";
+    if (name.includes("bca") || name.includes("bsc")) return "EASY";
 
-/* ================= ADMIN LOGIN PAGE ================= */
-router.get("/", (req, res) => {
-    res.sendFile(
-        path.join(__dirname, "../../Frontend/admin-login.html")
-    );
-});
+    return "MEDIUM";
+}
 
-/* ================= ADMIN DASHBOARD PAGE ================= */
-router.get("/dashboard", (req, res) => {
-    res.sendFile(
-        path.join(__dirname, "../../Frontend/admin-dashboard.html")
-    );
-});
+function loadEnvFromCandidates() {
+    const candidates = [
+        path.resolve(__dirname, ".env"),
+        path.resolve(__dirname, "../.env"),
+        path.resolve(__dirname, "../Backend/.env"),
+        path.resolve(__dirname, "../../.env")
+    ];
 
-/* ================= ADMIN LOGIN API ================= */
-router.post("/login", (req, res) => {
-    const { email, password } = req.body;
+    candidates.forEach(candidate => {
+        if (fs.existsSync(candidate)) {
+            dotenv.config({ path: candidate });
+        }
+    });
+}
 
-    if (!email || !password) {
-        return res.json({ success: false });
+loadEnvFromCandidates();
+
+function getAzureConfig() {
+    const endpoint = (process.env.AZURE_OPENAI_ENDPOINT || "").trim();
+    const deployment = (process.env.AZURE_OPENAI_DEPLOYMENT || "").trim();
+    const apiVersion = (process.env.AZURE_OPENAI_API_VERSION || "").trim();
+    const apiKey = (process.env.AZURE_OPENAI_API_KEY || "").trim();
+
+    if (!endpoint || !deployment || !apiVersion || !apiKey) {
+        const missing = [
+            endpoint ? null : "AZURE_OPENAI_ENDPOINT",
+            deployment ? null : "AZURE_OPENAI_DEPLOYMENT",
+            apiVersion ? null : "AZURE_OPENAI_API_VERSION",
+            apiKey ? null : "AZURE_OPENAI_API_KEY"
+        ]
+            .filter(Boolean)
+            .join(", ");
+
+        throw new Error(
+            `Azure OpenAI config missing in environment (${missing}). ` +
+            "Use Backend/.env (or Backend/Backend/.env) to set the values before starting the server."
+        );
     }
 
-    const startDate = exam_start_date || req.body.exam_date;
-    const endDate = exam_end_date || req.body.exam_date;
-    const eventType = (event_type || "REGULAR").toUpperCase();
+    return { endpoint, deployment, apiVersion, apiKey };
+}
 
-    db.query(
-        `
-        SELECT a.admin_id, a.college_id, c.college_name
-        FROM admins a
-        JOIN college c ON a.college_id = c.college_id
-        WHERE a.email_id = ? AND a.password = ?
-        `,
-        [email, password],
-        (err, rows) => {
-            if (err || !rows || rows.length === 0) {
-                return res.json({ success: false });
-            }
+function buildPrompt(course, difficulty, count, avoidList) {
+    const avoidText = avoidList && avoidList.length > 0
+        ? `Avoid these exact question texts:\n${avoidList.map(q => `- ${q}`).join("\n")}\n`
+        : "";
 
-            res.json({
-                success: true,
-                adminId: rows[0].admin_id,
-                collegeId: rows[0].college_id,
-                collegeName: rows[0].college_name
-            });
-        }
-    );
-});
+    return `
+Generate ${count} quantitative aptitude questions for the course "${course}".
+Difficulty should be ${difficulty}.
+Focus mainly on quantitative aptitude (percentages, ratios, time-speed-distance, algebra, number systems, probability, permutations/combinations, work/time, averages).
+You may include a small number of reasoning questions, but avoid subject-specific technical questions.
+${avoidText}
+Return ONLY a JSON array of objects with these exact keys:
+question_text, option_a, option_b, option_c, option_d, correct_answer
+Rules:
+- correct_answer must be one of: A, B, C, D
+- exactly 4 options, only one correct
+- no markdown, no extra text
+- make questions different from each other
+`;
+}
 
-/* ================= CREATE EVENT ================= */
-router.post("/event", (req, res) => {
-    const {
-        college_id,
-        exam_name,
-        exam_start_date,
-        exam_end_date,
-        start_time,
-        end_time,
-        cutoff_percentage,
-        event_type
-    } = req.body;
+function buildStreamPrompt(stream, difficulty, count, avoidList) {
+    const avoidText = avoidList && avoidList.length > 0
+        ? `Avoid these exact question texts:\n${avoidList.map(q => `- ${q}`).join("\n")}\n`
+        : "";
 
-    db.query(
-        `
-        INSERT INTO exam_event
-        (college_id, exam_name, exam_start_date, exam_end_date, start_time, end_time, cutoff_percentage, event_type, who_updated, updated_date, is_active, is_deleted)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ADMIN', CURRENT_DATE(), 'NO', 'NO')
-        `,
-        [
-            college_id,
-            exam_name,
-            startDate,
-            endDate,
-            start_time,
-            end_time,
-            cutoff_percentage,
-            eventType
-        ],
-        err => {
-            if (err) {
-                console.error("❌ Create event error:", err);
-                return res.json({ success: false });
-            }
-            res.json({ success: true });
-        }
-    );
-});
+    return `
+Generate ${count} analytical and applied reasoning questions for the walk-in stream "${stream}".
+Difficulty should be ${difficulty}.
+Prioritize data-and analytics-focused scenarios (data interpretation, logical reasoning, real-world problem solving, metrics, business math, estimations) that reflect what a walk-in student should master.
+${avoidText}
+Return ONLY a JSON array of objects with these exact keys:
+question_text, option_a, option_b, option_c, option_d, correct_answer
+Rules:
+- correct_answer must be one of: A, B, C, D
+- exactly 4 options, only one correct
+- no markdown, no extra text
+- keep options concise and varied
+`;
+}
 
-/* ================= UPDATE EVENT STATUS ================= */
-router.put("/event/status/:eventId", (req, res) => {
-    db.query(
-        `UPDATE exam_event SET is_active = ? WHERE event_id = ?`,
-        [req.body.status, req.params.eventId],
-        err => {
-            if (err) return res.json({ success: false });
-            res.json({ success: true });
-        }
-    );
-});
+function extractJsonArray(text) {
+    try {
+        const parsed = JSON.parse(text);
+        if (Array.isArray(parsed)) return parsed;
+    } catch (_) {
+        // fall through to extraction
+    }
 
-/* ================= DELETE EVENT ================= */
-router.put("/event/delete/:eventId", (req, res) => {
-    db.query(
-        `UPDATE exam_event SET is_deleted = 'YES' WHERE event_id = ?`,
-        [req.params.eventId],
-        err => {
-            if (err) return res.json({ success: false });
-            res.json({ success: true });
-        }
-    );
-});
+    const start = text.indexOf("[");
+    const end = text.lastIndexOf("]");
+    if (start !== -1 && end !== -1 && end > start) {
+        const slice = text.slice(start, end + 1);
+        const parsed = JSON.parse(slice);
+        if (Array.isArray(parsed)) return parsed;
+    }
 
-/* ================= ADMIN EVENTS ================= */
-router.get("/events/:collegeId", (req, res) => {
-    db.query(
-        `
-        SELECT *
-        FROM exam_event
-        WHERE college_id = ?
-          AND (is_deleted = 'NO' OR is_deleted IS NULL)
-        ORDER BY exam_start_date
-        `,
-        [req.params.collegeId],
-        (err, rows) => {
-            if (err) return res.json([]);
-            res.json(rows);
-        }
-    );
-});
+    throw new Error("Failed to parse JSON array from model response");
+}
 
-/* ================= ADMIN EXAMS ================= */
-router.get("/exams/:eventId", (req, res) => {
-    db.query(
-        `
-        SELECT exam_id, class, exam_status
-        FROM exams
-        WHERE event_id = ?
-        `,
-        [req.params.eventId],
-        (err, rows) => {
-            if (err) return res.json([]);
-            res.json(rows);
-        }
-    );
-});
+function normalizeQuestion(q) {
+    const questionText = String(q.question_text || "").trim();
+    const optionA = String(q.option_a || "").trim();
+    const optionB = String(q.option_b || "").trim();
+    const optionC = String(q.option_c || "").trim();
+    const optionD = String(q.option_d || "").trim();
+    const correct = String(q.correct_answer || "").trim().toUpperCase();
 
-/* ================= CREATE EXAM ================= */
-router.post("/exam", (req, res) => {
-    const { event_id, class_name } = req.body;
+    if (!questionText || !optionA || !optionB || !optionC || !optionD) return null;
+    if (!["A", "B", "C", "D"].includes(correct)) return null;
 
-    db.query(
-        `
-        INSERT INTO exams (event_id, class, exam_status)
-        VALUES (?, ?, 'DRAFT')
-        `,
-        [event_id, class_name],
-        err => {
-            if (err) return res.json({ success: false });
-            res.json({ success: true });
-        }
-    );
-});
+    return {
+        question_text: questionText,
+        option_a: optionA,
+        option_b: optionB,
+        option_c: optionC,
+        option_d: optionD,
+        correct_answer: correct
+    };
+}
 
-/* ================= DELETE EXAM ================= */
-router.delete("/exam/:examId", (req, res) => {
-    db.query(
-        `DELETE FROM questions WHERE exam_id = ?`,
-        [req.params.examId],
-        () => {
-            db.query(
-                `DELETE FROM exams WHERE exam_id = ?`,
-                [req.params.examId],
-                err => {
-                    if (err) return res.json({ success: false });
-                    res.json({ success: true });
-                }
-            );
-        }
-    );
-});
+async function callAzure(messages) {
+    const { endpoint, deployment, apiVersion, apiKey } = getAzureConfig();
+    const url = `${endpoint.replace(/\/+$/, "")}/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`;
 
-/* ================= GENERATE QUESTIONS (FINAL FIX) ================= */
-router.post("/generate-questions/:examId", async (req, res) => {
-    const examId = req.params.examId;
-    const { questionCount } = req.body;   // ✅ RECEIVED FROM UI
-
-    db.query(
-        `SELECT class, exam_status FROM exams WHERE exam_id = ?`,
-        [examId],
-        async (err, rows) => {
-
-            if (!rows || rows.length === 0) {
-                return res.json({ success: false, message: "Exam not found" });
-            }
-
-            if (rows[0].exam_status !== "DRAFT") {
-                return res.json({
-                    success: false,
-                    message: "Questions already generated"
-                });
-            }
-
-            try {
-                const questions = await generateQuestionsForClass(
-                    rows[0].class,
-                    Number(questionCount) || 10   // ✅ VARIABLE COUNT
-                );
-
-                const sql = `
-                    INSERT INTO questions
-                    (question_text, option_a, option_b, option_c, option_d, correct_answer, exam_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                `;
-
-                for (const q of questions) {
-                    await new Promise((resolve, reject) => {
-                        db.query(sql, [
-                            q.question_text,
-                            q.option_a,
-                            q.option_b,
-                            q.option_c,
-                            q.option_d,
-                            q.correct_answer,
-                            examId
-                        ], err => err ? reject(err) : resolve());
-                    });
-                }
-
-                db.query(
-                    `UPDATE exams SET exam_status = 'READY' WHERE exam_id = ?`,
-                    [examId],
-                    () => res.json({ success: true })
-                );
-
-            } catch (e) {
-                console.error("❌ Question generation error:", e);
-                res.status(500).json({ success: false });
+    const response = await axios.post(
+        url,
+        {
+            messages,
+            temperature: 0.7
+        },
+        {
+            headers: {
+                "Content-Type": "application/json",
+                "api-key": apiKey
             }
         }
     );
-});
 
-module.exports = router;
+    return response.data;
+}
+
+function shuffleInPlace(items) {
+    for (let i = items.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [items[i], items[j]] = [items[j], items[i]];
+    }
+}
+
+async function generateBatch(source, difficulty, count, avoidList, promptBuilder) {
+    const prompt = promptBuilder(source, difficulty, count, avoidList);
+    const data = await callAzure([
+        {
+            role: "system",
+            content: "You generate aptitude questions and output strict JSON only."
+        },
+        {
+            role: "user",
+            content: prompt
+        }
+    ]);
+
+    const content = data?.choices?.[0]?.message?.content || "";
+    const rawArray = extractJsonArray(content);
+    const normalized = rawArray
+        .map(normalizeQuestion)
+        .filter(Boolean);
+
+    if (normalized.length === 0) {
+        throw new Error("Model returned no valid questions");
+    }
+
+    return normalized;
+}
+
+async function generateQuestionsForSource(source, difficulty, count, promptBuilder) {
+    const cleanedSource = String(source || "").trim();
+    if (!cleanedSource) {
+        throw new Error("Missing source for question generation");
+    }
+
+    const unique = new Map();
+    const maxAttempts = 3;
+    let attempt = 0;
+
+    while (unique.size < count && attempt < maxAttempts) {
+        const remaining = count - unique.size;
+        const avoidList = Array.from(unique.keys());
+        const batch = await generateBatch(cleanedSource, difficulty, remaining, avoidList, promptBuilder);
+
+        for (const q of batch) {
+            const key = q.question_text.toLowerCase();
+            if (!unique.has(key)) unique.set(key, q);
+        }
+
+        attempt += 1;
+    }
+
+    const result = Array.from(unique.values()).slice(0, count);
+    shuffleInPlace(result);
+    return result;
+}
+
+async function generateQuestionsForCourse(course, count = 10) {
+    const difficulty = getDifficultyByCourse(course);
+    return generateQuestionsForSource(course, difficulty, count, buildPrompt);
+}
+
+async function generateQuestionsForStream(stream, count = 10) {
+    const difficulty = getDifficultyByCourse(stream);
+    return generateQuestionsForSource(stream, difficulty, count, buildStreamPrompt);
+}
+
+module.exports = {
+    generateQuestionsForCourse,
+    generateQuestionsForStream
+};
