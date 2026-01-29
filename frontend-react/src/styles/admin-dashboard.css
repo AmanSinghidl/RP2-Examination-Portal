@@ -50,12 +50,17 @@
 }
 
 .admin-dashboard .brand-logo img {
-    height: 80px;
+    height: 90px;
     width: auto;
     display: block;
-    transform: scale(1.05);
-    transform-origin: left;
-    transition: transform 0.3s ease;
+}
+
+.admin-dashboard .brand-logo {
+    background: transparent;
+    border: none;
+    padding: 0;
+    box-shadow: none;
+    width: 310px;
 }
 
 .admin-dashboard .topbar-search {
@@ -121,6 +126,81 @@
 
 .admin-dashboard .logout-btn:hover {
     filter: brightness(0.98);
+}
+
+.ghost-action {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.8);
+    padding: 6px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: border 0.2s ease, color 0.2s ease;
+}
+
+.ghost-action:hover {
+    border-color: rgba(255, 255, 255, 0.8);
+    color: #fff;
+}
+
+.result-review {
+    margin-top: 24px;
+}
+
+.result-review-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+}
+
+.question-review-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 18px;
+}
+
+.question-review-card {
+    background: rgba(255, 255, 255, 0.08);
+    padding: 18px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.question-review-text {
+    margin: 0 0 12px;
+    font-size: 15px;
+    color: #f3f4f6;
+}
+
+.question-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.question-option {
+    display: block;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    font-size: 14px;
+}
+
+.question-option.selected {
+    border-color: #fbbf24;
+    color: #fbbf24;
+}
+
+.question-option.correct {
+    border-color: #10b981;
+    color: #10b981;
+}
+
+.question-option.incorrect {
+    border-color: #ef4444;
+    color: #ef4444;
 }
 
 .admin-dashboard .dashboard-sidebar {

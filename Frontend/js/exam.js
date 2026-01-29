@@ -192,7 +192,7 @@ document.getElementById("examForm").addEventListener("submit", e => {
         // ✅ STORE SUCCESS MESSAGE
         localStorage.setItem(
             "examSuccessMessage",
-            "✅ Exam submitted successfully"
+            "Exam submitted successfully. Results will be published soon."
         );
 
         // ✅ REDIRECT TO DASHBOARD

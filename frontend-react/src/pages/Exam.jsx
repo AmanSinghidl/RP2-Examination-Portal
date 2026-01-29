@@ -145,7 +145,10 @@ function Exam() {
         setIsSubmitting(false);
         return;
       }
-      localStorage.setItem("examSuccessMessage", "Exam submitted successfully.");
+      localStorage.setItem(
+        "examSuccessMessage",
+        "Exam submitted successfully. Results will be published soon."
+      );
       navigate(`/result?examId=${examId}`);
     } catch (err) {
       console.error("Exam submit error:", err);

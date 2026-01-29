@@ -78,19 +78,22 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 32px 16px;
+    padding: 46px 28px;
 }
 
 .preexam-panel {
-    width: min(960px, 90vw);
+    width: min(1080px, 96vw);
+    min-height: 520px;
     background: #0f172a;
     border-radius: 28px;
     border: 1px solid rgba(255, 255, 255, 0.2);
-    padding: 32px;
+    padding: 40px;
     color: rgba(255, 255, 255, 0.95);
     box-shadow: 0 30px 60px rgba(15, 23, 42, 0.6);
     display: grid;
     gap: 20px;
+    font-size: 16px;
+    line-height: 1.65;
 }
 
 .preexam-header h1 {
@@ -108,7 +111,7 @@
 }
 
 .status-label {
-    font-size: 11px;
+    font-size: 16px;
     text-transform: uppercase;
     letter-spacing: 0.2em;
     color: rgba(248, 250, 252, 0.6);
@@ -117,12 +120,12 @@
 .status-label + p,
 .status-label + strong {
     margin-top: 6px;
-    font-size: 18px;
+    font-size: 16px;
 }
 
 .preexam-notices h2 {
     margin: 0;
-    font-size: 18px;
+    font-size: 16px;
     color: #e2e8f0;
 }
 
@@ -131,7 +134,7 @@
     padding-left: 18px;
     display: grid;
     gap: 10px;
-    font-size: 15px;
+    font-size: 16px;
     line-height: 1.6;
     color: rgba(226, 232, 240, 0.95);
 }
@@ -164,7 +167,7 @@
 
 .preexam-footnote {
     margin: 0;
-    font-size: 13px;
+    font-size: 16px;
     color: rgba(248, 250, 252, 0.7);
 }
 

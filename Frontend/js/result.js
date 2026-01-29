@@ -11,30 +11,17 @@ if (!examId) {
     window.location.href = "/student-dashboard.html";
 }
 
-fetch("http://localhost:5001/exam/result", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ studentId, examId })
-})
-.then(res => res.json())
-.then(data => {
-    if (!data.success) {
-        alert("Unable to load result");
-        return;
-    }
+const statusEl = document.getElementById("resultStatus");
+const detailsEl = document.getElementById("resultDetails");
 
-    // ✅ FIXED FIELD NAMES
-    document.getElementById("resultStatus").innerText =
-        data.resultStatus === "PASS" ? "🎉 PASS" : "❌ FAIL";
+if (statusEl) {
+    statusEl.innerText = "Exam Submitted Successfully";
+}
 
-    document.getElementById("resultDetails").innerHTML = `
-        <strong>Marks Obtained:</strong> ${data.totalMarks}
-    `;
-})
-.catch(err => {
-    console.error("Result error:", err);
-    alert("Server error while loading result");
-});
+if (detailsEl) {
+    detailsEl.innerText =
+        "Your responses are recorded. Results will be published soon.";
+}
 
 function goBack() {
     window.location.href = "/student-dashboard.html";

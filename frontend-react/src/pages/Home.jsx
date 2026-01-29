@@ -5,11 +5,11 @@ function Home() {
 
   return (
     <div className="landing-shell">
-      <header className="landing-header">
-        <div className="brand">
-          <span className="brand-mark">RP2</span>
-          <span className="brand-text">RP2 Scholarship Exam</span>
-        </div>
+        <header className="landing-header">
+          <div className="brand">
+            <img className="brand-logo" src="/assets/rp2-official.png" alt="RP2 logo" />
+            <span className="brand-text">RP2 Scholarship Exam</span>
+          </div>
         <nav className="landing-nav">
           <a href="#" className="nav-link">About</a>
           <a href="#" className="nav-link">Eligibility</a>

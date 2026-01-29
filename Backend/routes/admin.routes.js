@@ -175,6 +175,56 @@ router.put("/event/status/:eventId", (req, res) => {
     );
 });
 
+/* ================= EVENT OVERRIDES ================= */
+router.post("/event/override", (req, res) => {
+    const { student_id, event_id, is_allowed } = req.body;
+    if (!student_id || !event_id) {
+        return res.status(400).json({
+            success: false,
+            message: "Missing student or event"
+        });
+    }
+
+    const allowed = is_allowed !== false;
+    db.query(
+        `
+        INSERT INTO student_event_overrides (student_id, event_id, is_allowed)
+        VALUES (?, ?, ?)
+        ON DUPLICATE KEY UPDATE is_allowed = ?, created_at = CURRENT_TIMESTAMP
+        `,
+        [student_id, event_id, allowed ? 1 : 0, allowed ? 1 : 0],
+        err => {
+            if (err) {
+                console.error("❌ Override update error:", err);
+                return res.json({ success: false });
+            }
+            res.json({ success: true });
+        }
+    );
+});
+
+router.delete("/event/override", (req, res) => {
+    const { student_id, event_id } = req.body;
+    if (!student_id || !event_id) {
+        return res.status(400).json({
+            success: false,
+            message: "Missing student or event"
+        });
+    }
+
+    db.query(
+        `DELETE FROM student_event_overrides WHERE student_id = ? AND event_id = ?`,
+        [student_id, event_id],
+        err => {
+            if (err) {
+                console.error("❌ Override delete error:", err);
+                return res.json({ success: false });
+            }
+            res.json({ success: true });
+        }
+    );
+});
+
 /* ================= DELETE EVENT ================= */
 router.put("/event/delete/:eventId", (req, res) => {
     db.query(
@@ -324,6 +374,43 @@ router.get("/results/:collegeId", (req, res) => {
             res.json(rows || []);
         }
     );
+});
+
+router.get("/result-answers/:resultId", (req, res) => {
+    const { resultId } = req.params;
+    if (!resultId) {
+        return res.status(400).json({ success: false });
+    }
+
+    const query = `
+        SELECT 
+            q.question_id,
+            q.question_text,
+            q.option_a,
+            q.option_b,
+            q.option_c,
+            q.option_d,
+            q.correct_answer,
+            sa.selected_option
+        FROM results r
+        JOIN exams e ON e.exam_id = r.exam_id
+        JOIN exam_event ev ON ev.event_id = e.event_id
+        JOIN student_answers sa 
+            ON sa.exam_id = e.exam_id 
+            AND sa.student_id = r.student_id
+        JOIN questions q ON q.question_id = sa.question_id
+        WHERE r.result_id = ?
+          AND ev.college_id = ?
+        ORDER BY q.question_id
+    `;
+
+    db.query(query, [resultId, req.session.admin.collegeId], (err, rows) => {
+        if (err) {
+            console.error("Result questions error:", err);
+            return res.status(500).json({ success: false });
+        }
+        res.json({ success: true, questions: rows || [] });
+    });
 });
 
 /* ================= STUDENT PROFILES ================= */

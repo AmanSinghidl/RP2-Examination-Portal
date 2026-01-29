@@ -86,6 +86,21 @@ router.post("/submit", (req, res) => {
                     message: "Exam submitted successfully"
                 })
             );
+            db.query(
+                `
+                INSERT INTO student_event_attempts (student_id, event_id)
+                SELECT ?, event_id
+                FROM exams
+                WHERE exam_id = ?
+                ON DUPLICATE KEY UPDATE attempted_at = CURRENT_TIMESTAMP
+                `,
+                [studentId, examId],
+                err3 => {
+                    if (err3) {
+                        console.error("Event attempt mark error:", err3);
+                    }
+                }
+            );
         }
     );
 });

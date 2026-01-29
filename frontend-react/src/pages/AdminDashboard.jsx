@@ -37,6 +37,8 @@ function AdminDashboard() {
   const [selectedEventId, setSelectedEventId] = useState("");
   const [selectedExamId, setSelectedExamId] = useState("");
   const [questionCount, setQuestionCount] = useState("");
+  const [activeResultDetail, setActiveResultDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const [eventName, setEventName] = useState("");
   const [eventStartDate, setEventStartDate] = useState("");
@@ -328,6 +330,25 @@ function AdminDashboard() {
     } catch (err) {
       console.error("Load results error:", err);
       setRecentResults([]);
+    }
+  };
+
+  const viewResultDetail = async (resultId) => {
+    if (!resultId) return;
+    setDetailLoading(true);
+    try {
+      const response = await fetch(`/admin/result-answers/${resultId}`);
+      const data = await response.json();
+      if (data.success) {
+        setActiveResultDetail({
+          resultId,
+          questions: data.questions || []
+        });
+      }
+    } catch (err) {
+      console.error("Result detail error:", err);
+    } finally {
+      setDetailLoading(false);
     }
   };
 
@@ -777,20 +798,21 @@ function AdminDashboard() {
               {activeSection === "results" && (
               <div className="dashboard-section admin-section" id="admin-results">
                 <h2>Recent Results</h2>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Result ID</th>
-                      <th>Student</th>
-                      <th>Exam</th>
-                      <th>Date</th>
-                      <th>Course</th>
-                      <th>Marks</th>
-                      <th>Result</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Result ID</th>
+                        <th>Student</th>
+                        <th>Exam</th>
+                        <th>Date</th>
+                        <th>Course</th>
+                        <th>Marks</th>
+                        <th>Result</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
                     {recentResults.length === 0 && (
                       <tr>
                         <td colSpan="8" style={{ textAlign: "center" }}>No results found</td>
@@ -826,6 +848,15 @@ function AdminDashboard() {
                             </span>
                           </td>
                           <td>{result.attempt_status}</td>
+                          <td>
+                            <button
+                              className="ghost-action"
+                              type="button"
+                              onClick={() => viewResultDetail(result.result_id)}
+                            >
+                              View
+                            </button>
+                          </td>
                         </tr>
                       );
                     })}
@@ -1336,6 +1367,62 @@ function AdminDashboard() {
                   <span className="profile-value">Administrator</span>
                 </div>
               </div>
+              {activeResultDetail && (
+                <div className="dashboard-section admin-section result-review">
+                  <div className="result-review-header">
+                    <h3>Exam review — Result #{activeResultDetail.resultId}</h3>
+                    <button
+                      className="ghost-action"
+                      type="button"
+                      onClick={() => setActiveResultDetail(null)}
+                    >
+                      Close
+                    </button>
+                  </div>
+                  {detailLoading ? (
+                    <p>Loading questions…</p>
+                  ) : (
+                    <div className="question-review-grid">
+                      {(activeResultDetail.questions || []).map((q) => {
+                        const options = [
+                          { key: "A", label: q.option_a },
+                          { key: "B", label: q.option_b },
+                          { key: "C", label: q.option_c },
+                          { key: "D", label: q.option_d }
+                        ];
+                        const isSelected = (option) => option.key === q.selected_option;
+                        const isCorrect = (option) => option.key === q.correct_answer;
+                        return (
+                          <article className="question-review-card" key={`${q.question_id}`}>
+                            <p className="question-review-text">
+                              <strong>Q:</strong> {q.question_text}
+                            </p>
+                            <div className="question-options">
+                              {options.map((option) => (
+                                <span
+                                  key={option.key}
+                                  className={[
+                                    "question-option",
+                                    isSelected(option) ? "selected" : "",
+                                    isCorrect(option) ? "correct" : "",
+                                    isSelected(option) && option.key !== q.correct_answer
+                                      ? "incorrect"
+                                      : ""
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" ")}
+                                >
+                                  <strong>{option.key}</strong> {option.label}
+                                </span>
+                              ))}
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
           </section>

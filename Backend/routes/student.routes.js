@@ -142,6 +142,13 @@ router.get("/exams/:studentId", (req, res) => {
         FROM students s
         JOIN exams e ON e.course = s.course
         JOIN exam_event ev ON ev.event_id = e.event_id
+        LEFT JOIN student_event_attempts sea
+            ON sea.student_id = s.student_id
+            AND sea.event_id = e.event_id
+        LEFT JOIN student_event_overrides seo
+            ON seo.student_id = s.student_id
+            AND seo.event_id = e.event_id
+            AND seo.is_allowed = TRUE
         WHERE s.student_id = ?
           AND e.exam_status = 'READY'
           AND ev.is_active = 'YES'
@@ -153,6 +160,7 @@ router.get("/exams/:studentId", (req, res) => {
               WHERE r.student_id = s.student_id
                 AND r.exam_id = e.exam_id
           )
+          AND (sea.student_event_attempt_id IS NULL OR seo.student_event_override_id IS NOT NULL)
         ORDER BY ev.exam_start_date
     `;
 

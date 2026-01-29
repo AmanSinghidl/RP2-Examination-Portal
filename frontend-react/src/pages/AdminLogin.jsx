@@ -62,7 +62,7 @@ function AdminLogin() {
     <div className="landing-shell">
       <header className="landing-header">
         <div className="brand">
-          <span className="brand-mark">RP2</span>
+          <img className="brand-logo" src="/assets/rp2-official.png" alt="RP2 logo" />
           <span className="brand-text">RP2 Scholarship Exam</span>
         </div>
         <nav className="landing-nav">
